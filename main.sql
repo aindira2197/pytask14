@@ -1,0 +1,59 @@
+CREATE TABLE LRU_Cache (
+    id INT PRIMARY KEY,
+    key VARCHAR(255) NOT NULL,
+    value VARCHAR(255) NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_key ON LRU_Cache (key);
+
+CREATE FUNCTION GET_LRU_CACHE(key VARCHAR(255))
+RETURNS VARCHAR(255)
+BEGIN
+    DECLARE value VARCHAR(255);
+    SELECT value INTO value FROM LRU_Cache WHERE key = LRU_Cache.key ORDER BY timestamp DESC LIMIT 1;
+    RETURN value;
+END;
+
+CREATE FUNCTION SET_LRU_CACHE(key VARCHAR(255), value VARCHAR(255))
+RETURNS INT
+BEGIN
+    INSERT INTO LRU_Cache (key, value) VALUES (key, value);
+    RETURN 1;
+END;
+
+CREATE FUNCTION DELETE_LRU_CACHE(key VARCHAR(255))
+RETURNS INT
+BEGIN
+    DELETE FROM LRU_Cache WHERE key = LRU_Cache.key;
+    RETURN 1;
+END;
+
+CREATE TRIGGER trg_lru_cache BEFORE INSERT ON LRU_Cache
+FOR EACH ROW
+BEGIN
+    IF (SELECT COUNT(*) FROM LRU_Cache) >= 100 THEN
+        DELETE FROM LRU_Cache ORDER BY timestamp ASC LIMIT 1;
+    END IF;
+END;
+
+CREATE PROCEDURE SP_LRU_CACHE(key VARCHAR(255), value VARCHAR(255), operation VARCHAR(10))
+BEGIN
+    IF operation = 'GET' THEN
+        SELECT GET_LRU_CACHE(key);
+    ELSEIF operation = 'SET' THEN
+        CALL SET_LRU_CACHE(key, value);
+    ELSEIF operation = 'DELETE' THEN
+        CALL DELETE_LRU_CACHE(key);
+    END IF;
+END;
+
+INSERT INTO LRU_Cache (key, value) VALUES ('key1', 'value1');
+INSERT INTO LRU_Cache (key, value) VALUES ('key2', 'value2');
+INSERT INTO LRU_Cache (key, value) VALUES ('key3', 'value3');
+
+CALL SP_LRU_CACHE('key1', 'value1', 'GET');
+CALL SP_LRU_CACHE('key2', 'value2', 'SET');
+CALL SP_LRU_CACHE('key3', 'value3', 'DELETE');
+
+SELECT * FROM LRU_Cache;
